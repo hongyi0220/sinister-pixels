@@ -1,0 +1,169 @@
+$cellWidth: 20px;
+$cellHeight: $cellWidth;
+$tableWidth: 50;
+$tableHeight: 100;
+$infoHeight: 130px;
+@mixin cellSize($w: $cellWidth, $h: $cellHeight) {
+   width: $w;
+   height: $h;
+}
+* {
+   box-sizing: border-box;
+   margin: 0;
+   font-size: 1em;
+   font-family: 'Press Start 2P', cursive;
+}
+body {
+   background: black;
+}
+::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    background: transparent;
+}
+.container {
+   position: relative;
+   margin: 0 auto;
+   width: $tableWidth * $cellWidth;
+   background: url('dungeon-crawler-assets/dirt.png') center/100%;
+   .info {
+      padding-top: 1em;
+      z-index: 10;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      height: $infoHeight;
+      position: fixed;
+      background-color: rgba(0, 0, 0, 1);
+      top: 0;
+      font-size: 1em;
+      .stats {
+         color: white;
+         line-height: 1.5em;
+      }
+   }
+   .start-screen {
+      width: $tableWidth * $cellWidth;
+      position: absolute;
+      margin-top: -$infoHeight;
+      top: 0;
+      left: 0;
+      background: black !important;
+      z-index: 20;
+      color: white;
+      text-align: center;
+      .title {
+         font-size: 1.5em;
+         top: 6em !important;
+      }
+      .footer {
+         font-size: 1em;
+         top: 6em !important;
+      }
+      .title, .footer, .controls {
+         position: relative;
+
+      }
+      .controls {
+         text-align: center;
+         top: 50%;
+         transform: translateY(-1.5em);
+         button {
+            padding: 1em 1em 1em 1em;
+            border-radius: 5px;
+         }
+         label {
+            color: white;
+         }
+      }
+   }
+   .app {
+      width: $tableWidth * $cellWidth;
+      margin: 0 auto;
+      margin-top: $infoHeight;
+      .table, .fog {
+         display: inline-block;
+         tr {
+            .cell {
+               @include cellSize;
+            }
+         }
+      }
+      .table {
+         tr {
+            .cell {
+               &.player-front {
+                  background: url('dungeon-crawler-assets/player/p1-front-stand.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.player-back {
+                  background: url('dungeon-crawler-assets/player/p1-back-stand.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.player-left {
+                  background: url('dungeon-crawler-assets/player/p1-left-stand.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.player-right {
+                  background: url('dungeon-crawler-assets/player/p1-right-stand.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.enemy {
+                  background: url('dungeon-crawler-assets/ghost.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.potion {
+                  background: url('dungeon-crawler-assets/potion.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.loot {
+                  background: url('dungeon-crawler-assets/sword.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.boss-top-left {
+                  background: url('dungeon-crawler-assets/demon/demon-top-left.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.boss-top-right {
+                  background: url('dungeon-crawler-assets/demon/demon-top-right.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.boss-bottom-left {
+                  background: url('dungeon-crawler-assets/demon/demon-bottom-left.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.boss-bottom-right {
+                  background: url('dungeon-crawler-assets/demon/demon-bottom-right.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+               &.portal {
+                  background: url('dungeon-crawler-assets/door.png') no-repeat center/100% !important;
+                  background-size: cover !important;
+               }
+            }
+         }
+      }
+      .fog {
+         position: absolute;
+         top: 0;
+         left: 0;
+         tr {
+            .cell {
+               &.clear {
+                  background-color: rgba(255,255,255,0) !important;
+               }
+               &.blurry {
+                  background-color: rgba(0,0,0,0.4) !important;
+               }
+               &.blurrier {
+                  background-color: rgba(0,0,0,0.6) !important;
+               }
+               &.blurriest {
+                  background-color: rgba(0,0,0,0.8) !important;
+               }
+            }
+         }
+      }
+
+   }
+}

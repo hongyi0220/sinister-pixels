@@ -1,0 +1,958 @@
+class App extends React.Component {
+   constructor(props) {
+      super(props);
+      this.state = {
+         table: {content: [],
+                 width: null,
+                 height: null,
+                 playerPosition: null,
+                 playerStats: null,
+                 caves: [],
+                 boss: null,
+                 dungeonLevel: 1
+             },
+        screen: {yCoord: 0},
+        music: this.aSoundOf('music'),
+        startScreen: true
+      };
+      this.makeTable = this.makeTable.bind(this);
+      this.makeBox = this.makeBox.bind(this);
+      this.makeCaves = this.makeCaves.bind(this);
+      this.isEdgeCell = this.isEdgeCell.bind(this);
+      this.generatePlayer = this.generatePlayer.bind(this);
+      this.movePlayer = this.movePlayer.bind(this);
+      this.connectCaves = this.connectCaves.bind(this);
+      this.findEdgeCells = this.findEdgeCells.bind(this);
+      this.hasCave = this.hasCave.bind(this);
+      this.generateEnemies = this.generateEnemies.bind(this);
+      this.aNumberBetween = this.aNumberBetween.bind(this);
+      this.avgOf = this.avgOf.bind(this);
+      this.findEmptyCells = this.findEmptyCells.bind(this);
+      this.randomNumericElementsFromArray = this.randomNumericElementsFromArray.bind(this);
+      this.generatePotions = this.generatePotions.bind(this);
+      this.generateLoot = this.generateLoot.bind(this);
+      this.generateBoss = this.generateBoss.bind(this);
+      this.generatePortal = this.generatePortal.bind(this);
+      this.generateNewLevel = this.generateNewLevel.bind(this);
+      this.findPlayerCoords = this.findPlayerCoords.bind(this);
+      this.aSoundOf = this.aSoundOf.bind(this);
+      this.toggleMusic = this.toggleMusic.bind(this);
+      this.unmountStartScreen = this.unmountStartScreen.bind(this);
+      this.scrollToPlayerPosition = this.scrollToPlayerPosition.bind(this);
+      this.handleButtonClick = this.handleButtonClick.bind(this);
+   }
+
+   scrollToPlayerPosition() {
+       const state = {...this.state};
+       window.scrollTo(0, state.screen.yCoord);
+   }
+
+   unmountStartScreen() {
+       this.setState({ startScreen: false });
+   }
+
+   handleButtonClick() {
+       this.unmountStartScreen();
+       this.scrollToPlayerPosition();
+   }
+
+   toggleMusic(e) {
+       const music = this.state.music;
+       if (e.target.checked) {
+           if (typeof music.loop == 'boolean') music.loop = true;
+           else {
+               music.addEventListener('ended', () => {
+                   music.currentTime = 0;
+                   music.play();
+               }, false);
+           }
+           music.play();
+       } else {
+           music.pause();
+           music.currentTime = 0;
+       }
+   }
+
+   generateNewLevel() {
+       let table = {...this.state.table};
+       table.dungeonLevel += 1;
+       table.caves = [];
+       this.setState({ table });
+       this.makeTable(50, 100);
+       this.makeCaves(8, 12, 0.015);
+       this.connectCaves();
+       this.generatePlayer('old');
+       this.generatePortal();
+       this.generateEnemies(40);
+       this.generatePotions(30);
+       this.generateBoss(2);
+       this.movePlayer();
+   }
+
+   makeTable(width, height) {
+      let state = {...this.state};
+      for (let i = 0; i < width * height; i++)
+         state.table.content[i] = {
+            wall: true,
+            player: false,
+            enemy: false,
+            currentEnemy: null,
+            boss: false,
+            portal: false,
+            potion: false,
+            loot: false,
+            fog: true,
+            clear: false,
+            blurry: false,
+            blurrier: false,
+            blurriest: false
+         };
+      state.table.width = width;
+      state.table.height = height;
+      this.setState({ state });
+   }
+
+   isEdgeCell(cellIndex, width) {
+      const leftEdgeCell = cellIndex % width === 0;
+      const rightEdgeCell = (cellIndex + 1) % width === 0;
+      return {
+         leftEdgeCell,
+         rightEdgeCell
+      }
+   }
+   // This finds the cellIndexes on edges of a cave
+   findEdgeCells(from, width, height) {
+      let table = {...this.state.table};
+      let right = [];
+      let bottom = [];
+      for (let i = 0; i < height; i++) {
+         right.push(from + (width - 1) + table.width * i);
+      }
+      for (let i = 0; i < width; i++) {
+         bottom.push(from + i + table.width * (height -1));
+      }
+      return {
+         right: right,
+         bottom: bottom
+      }
+   }
+   // This finds the distance of the nearest cell
+   // in the direction, given a cellIndex
+   hasCave(edgeCell) {
+      let table = {...this.state.table};
+      let cells = table.content;
+      const inEast = (edgeCell) => {
+         const distToEastEdge = (from) => {
+            const numOfRows = (() => {
+               let x = 0;
+               while (table.width * x - 1 < from)  {
+                  x++;
+               }
+               return x;
+            })();
+            return table.width * numOfRows - from - 1;
+         }
+         const dist = distToEastEdge(edgeCell);
+         for (var i = 1; i < dist; i++) {
+            if (cells[edgeCell + i] &&
+                !cells[edgeCell + i].wall) {
+               return {distance: i};
+            }
+         }
+         return false;
+      }
+      const inSouth = (edgeCell) => {
+         const distToSouthEdge = (from) => {
+            const numOfRows = (() => {
+               let x = 0;
+               while (from + table.width * x - 1 < cells.length - 1)  {
+                  x++;
+               }
+               return x - 1;
+            })();
+            return numOfRows;
+         }
+         const dist = distToSouthEdge(edgeCell);
+         for (var i = 1; i < dist; i++) {
+            if (cells[edgeCell + table.width * i] &&
+                !cells[edgeCell + table.width * i].wall) {
+               return {distance: i};
+            }
+         }
+         return false;
+      }
+      return {
+         inEast: inEast(edgeCell),
+         inSouth: inSouth(edgeCell)
+      }
+   }
+
+   connectCaves() {
+      let table = {...this.state.table};
+      let cells = table.content;
+      table.caves.forEach(cave => {
+         let rightEdgeCells = this.findEdgeCells(cave.from, cave.caveWidth, cave.caveHeight).right;
+         rightEdgeCells = rightEdgeCells.filter(edgeCell =>
+            this.hasCave(edgeCell).inEast
+         );
+         const randomEastEdgeCell = rightEdgeCells[Math.floor(Math.random() * rightEdgeCells.length)];
+         const foundEastCave = this.hasCave(randomEastEdgeCell).inEast;
+         const distanceToEast = foundEastCave.distance;
+         if (foundEastCave) {
+            for (let i = 1; i < distanceToEast; i++) {
+               table.content[randomEastEdgeCell + i].wall = false;
+            }
+         }
+
+         let bottomEdgeCells = this.findEdgeCells(cave.from, cave.caveWidth, cave.caveHeight).bottom;
+         bottomEdgeCells = bottomEdgeCells.filter(edgeCell => {
+            return this.hasCave(edgeCell).inSouth;
+         });
+         const randomSouthEdgeCell = bottomEdgeCells[Math.floor(Math.random() * bottomEdgeCells.length)];
+         const foundSouthCave = this.hasCave(randomSouthEdgeCell).inSouth;
+         const distanceToSouth = foundSouthCave.distance;
+         if (foundSouthCave) {
+            for (let i = 1; i < distanceToSouth; i++) {
+               table.content[randomSouthEdgeCell + table.width * i].wall = false;
+            }
+         }
+      });
+      this.setState({ table });
+   }
+
+   // This converts walls into caves
+   aNumberBetween(min, max) {
+      const randomNumInRange = () => Math.floor(Math.random() * (max - min + 1) + min);
+      return randomNumInRange();
+   }
+
+   makeBox(topLeftIndexOfBox, boxWidth, boxHeight, frequency, pushTo) {
+       let table = {...this.state.table};
+       const cells = table.content;
+       // Checks to see if a box is going to be cut off
+       // because it's close to the right edge
+       const anyLeftEdgeCells = (topLeftIndexOfBox) => {
+          for (let i = 1; i < boxWidth; i++) {
+             if (this.isEdgeCell(topLeftIndexOfBox + i, table.width).leftEdgeCell)
+                return true;
+          }
+          return false;
+       }
+       // Conditions to meet to generate a box
+       if (pushTo === 'caves') {
+           if (// Is current cell on the right edge
+              !this.isEdgeCell(topLeftIndexOfBox, table.width).rightEdgeCell &&
+              !anyLeftEdgeCells(topLeftIndexOfBox) &&
+              cells[topLeftIndexOfBox] &&
+              // Is current cell a wall
+              cells[topLeftIndexOfBox].wall &&
+              frequency &&
+              // These conditions prevent boxes next to each other from sticking togther
+              cells[topLeftIndexOfBox - 1] && cells[topLeftIndexOfBox - 1].wall &&
+              cells[topLeftIndexOfBox - 1 + table.width * Math.ceil((boxHeight - 1) / 2)] &&
+              cells[topLeftIndexOfBox - 1 + table.width * Math.ceil((boxHeight - 1) / 2)].wall &&
+              cells[topLeftIndexOfBox - 1 + table.width * (boxHeight - 1)] &&
+              cells[topLeftIndexOfBox - 1 + table.width * (boxHeight - 1)].wall &&
+              cells[topLeftIndexOfBox + (boxWidth - 1) + 1] &&
+              cells[topLeftIndexOfBox + (boxWidth - 1) + 1].wall &&
+              // These prevent boxes on top of each other from sticking together
+              cells[topLeftIndexOfBox - table.width] &&
+              cells[topLeftIndexOfBox - table.width].wall &&
+              cells[topLeftIndexOfBox + Math.ceil((boxWidth - 1) / 2) - table.width] &&
+              cells[topLeftIndexOfBox + Math.ceil((boxWidth - 1) / 2) - table.width].wall &&
+              cells[topLeftIndexOfBox + (boxWidth - 1) - table.width] &&
+              cells[topLeftIndexOfBox + (boxWidth - 1) - table.width].wall &&
+               // Is current cell valid
+              cells[topLeftIndexOfBox] &&
+               // Is top-right corner of cave a valid cell
+              cells[topLeftIndexOfBox + (boxWidth - 1)] &&
+               // This prevents boxes from overlapping each other
+              cells[topLeftIndexOfBox + Math.ceil((boxWidth - 1) / 2) +
+                    table.width * Math.ceil((boxHeight - 1) / 2)] &&
+              cells[topLeftIndexOfBox + Math.ceil((boxWidth - 1) / 2) +
+                    table.width * Math.ceil((boxHeight - 1) / 2)].wall &&
+              // Is top-right corner of box currently a wall
+              cells[topLeftIndexOfBox + (boxWidth - 1)].wall &&
+               // Is bottom-left corner of box a valid cell
+              cells[topLeftIndexOfBox + table.width * (boxHeight - 1)] &&
+               // Is bottom-right corner of box a valid cell
+              cells[topLeftIndexOfBox + (boxWidth - 1) + table.width * (boxHeight - 1)]) {
+                table[pushTo].push({from: topLeftIndexOfBox, caveWidth: boxWidth, caveHeight: boxHeight});
+              for (var j = 0; j < boxWidth; j++) {
+                 table.content[topLeftIndexOfBox + j].wall = false;
+                 for (var k = 1; k < boxHeight; k++) {
+                    table.content[topLeftIndexOfBox + j + table.width * k].wall = false;
+                 }
+              }
+           }
+       } else if (pushTo === 'boss') {
+           for (var j = 0; j < boxWidth; j++) {
+
+              table.content[topLeftIndexOfBox + j].wall = false;
+              if (j === 0) table.content[topLeftIndexOfBox + j][pushTo] = 'top-left';
+              else if (j === 1)table.content[topLeftIndexOfBox + j][pushTo] = 'top-right';
+
+              for (var k = 1; k < boxHeight; k++) {
+
+                 table.content[topLeftIndexOfBox + j + table.width * k].wall = false;
+                 if (j === 0)
+                    table.content[topLeftIndexOfBox + j + table.width * k][pushTo] = 'bottom-left';
+                 else if (j === 1)
+                    table.content[topLeftIndexOfBox + j + table.width * k][pushTo] = 'bottom-right';
+              }
+           }
+       }
+   }
+
+   makeCaves(minLength, maxLength, freq) {
+      const min = minLength;
+      const max = maxLength;
+      let table = {...this.state.table};
+      for (var i = 0; i < table.content.length; i++) {
+         const caveWidth = this.aNumberBetween(min, max);
+         const caveHeight = this.aNumberBetween(min, max);
+         const cells = table.content;
+         const frequency = Math.random() < freq;
+         this.makeBox(i, caveWidth, caveHeight, frequency, 'caves');
+      }
+      this.setState({ table });
+   }
+
+   randomNumericElementsFromArray(array, quantity, no_neighbors_opt_) {
+      const table = {...this.state.table};
+      array = array.map(e => Number(e));
+      let elements = [];
+         const getRandomElement = (array) => {
+            const randomElement = Math.floor(Math.random() * array.length);
+            return array[randomElement];
+         };
+         for (let i = 0; i < quantity; i++) {
+            const randomElement = getRandomElement(array);
+            elements.push(randomElement);
+            // This prevents duplicate selection of random empty cell
+            const elementIndex = array.indexOf(randomElement);
+            array.splice(elementIndex, 1);
+
+            // This returns cells with no neighboring cells
+            if (arguments[2] == 'no-neighbors') {
+                const rightElementIndex = array.indexOf(randomElement + 1);
+                array.splice(rightElementIndex, 1);
+                const leftElementIndex = array.indexOf(randomElement - 1);
+                array.splice(leftElementIndex, 1);
+                const topElementIndex = array.indexOf(randomElement - table.width);
+                array.splice(topElementIndex, 1);
+
+                const topRightElementIndex = array.indexOf(randomElement + 1 - table.width);
+                array.splice(topRightElementIndex, 1);
+
+                const topLeftElementIndex = array.indexOf(randomElement - 1 - table.width);
+                array.splice(topLeftElementIndex, 1);
+
+                const bottomElementIndex = array.indexOf(randomElement + table.width);
+                array.splice(bottomElementIndex, 1);
+
+                const bottomRightElementIndex = array.indexOf(randomElement + 1 + table.width);
+                array.splice(bottomRightElementIndex, 1);
+
+                const bottomLeftElementIndex = array.indexOf(randomElement - 1 + table.width);
+                array.splice(bottomLeftElementIndex, 1);
+            }
+         }
+         if (quantity > 1) return elements;
+         if (quantity === 1) return elements[0];
+   }
+
+   findEmptyCells() {
+      const table = {...this.state.table};
+      let emptyCells = table.content.map((cell, i) => {if(!cell.wall && !cell.player && !cell.enemy && !cell.loot && !cell.boss && !cell.potion && !cell.portal) return i}).filter(e => Number.isInteger(e));
+      return emptyCells;
+   }
+
+   generatePlayer(newOrOld) {
+      let table = {...this.state.table};
+      // Find empty cells
+      const emptyCells = this.findEmptyCells();
+      // Pick a random empty cell
+      if (!emptyCells.length) throw new Error('No empty cell to generate player')
+      const randomCellIndex = this.randomNumericElementsFromArray(emptyCells, 1);
+
+      table.content[randomCellIndex].player = true;
+      table.content[randomCellIndex].fog = false;
+      if (newOrOld === 'new')
+      table.playerStats = {health: 45,
+                           level: 1,
+                           xp: 0,
+                           strength: 0.5,
+                           weapon: {name: 'Sturdy Stick',
+                                    damage: {min: 5, max: 8}
+                                },
+                            xpCap: 50
+
+                          };
+
+      else if (newOrOld === 'old') table.playerStats = table.playerStats;
+      table.playerPosition = randomCellIndex;
+      this.findPlayerCoords(randomCellIndex, 20);
+      this.setState({ table });
+   }
+
+   generatePortal() {
+       let table = {...this.state.table};
+       const emptyCells = this.findEmptyCells();
+       if (!emptyCells.length) throw new Error('No empty cell to generate portal')
+       const randomCellIndex = this.randomNumericElementsFromArray(emptyCells, 1);
+       if (!randomCellIndex) throw new Error('Invalid index returned from function "randomNumericElementsFromArray"');
+       table.content[randomCellIndex].portal = true;
+   }
+
+   generateEnemies(numberOfEnemies) {
+      let table = {...this.state.table};
+      const emptyCells = this.findEmptyCells();
+      if (!emptyCells.length) throw new Error('No empty cell to generate enemies');
+      const randomCellIndexes = this.randomNumericElementsFromArray(emptyCells, numberOfEnemies, 'no-neighbors');
+      const damage = 4 + table.dungeonLevel * 3;
+      const health = 15 + table.dungeonLevel * 5;
+      randomCellIndexes.forEach(index => {
+          if (table.content[index])
+            table.content[index].enemy = {health: this.aNumberBetween(health - 5, health + 5), damage: this.aNumberBetween(damage - 5, damage + 5)};
+      });
+   }
+
+   generatePotions(numberOfPotions) {
+      let table = {...this.state.table};
+      const potionSize = this.aNumberBetween(2, 3) * 10;
+      const emptyCells = this.findEmptyCells();
+      if (!emptyCells.length) throw new Error('No empty cell to generate potions');
+      const randomCellIndexes = this.randomNumericElementsFromArray(emptyCells, numberOfPotions, 'no-neighbors');
+      randomCellIndexes.forEach(index => {
+          if (table.content[index])
+            table.content[index].potion = potionSize
+      });
+   }
+
+   generateLoot(destinationIndex, rarity, dropChance) {
+       let content = {...this.state.table.content};
+       const loot  = {
+           basic: [
+               {name: 'Wooden Club', damage: {min: 8, max: 12}},
+               {name: 'Weathered Knife', damage: {min: 5, max: 16}},
+               {name: 'Distressed Axe', damage: {min: 11, max: 13}},
+               {name: 'Tangled Flail', damage: {min: 3, max: 29}},
+               {name: 'Long Sword', damage: {min: 15, max: 20}}
+           ],
+           pro: [
+               {name: 'Spiked Club', damage: {min: 22, max: 24}},
+               {name: 'Serrated Machete', damage: {min: 22, max: 29}},
+               {name: 'Battle Axe', damage: {min: 15, max: 33}},
+               {name: 'Spiked Skull Flail', damage: {min: 6, max: 59}},
+               {name: 'Samurai Sword', damage: {min: 30, max: 45}}
+           ],
+           rare: [
+               {name: 'Stranger Things™ Spiked Bat', damage: {min: 40, max: 49}},
+               {name: 'Freddy Krueger\'s Glove', damage: {min: 1, max: 120}},
+               {name: 'Hattori Hanzo Katana Sword', damage: {min: 60, max: 100}},
+               {name: 'Lightsaber', damage: {min: 110, max: 120}},
+               {name: 'Shaun\'s Cricket Bat', damage: {min: 1, max: 395}}
+           ]
+       };
+       const getRandomItem = (rarity) => {
+           const length = loot[rarity].length;
+           const index = Math.floor(Math.random() * length + 1);
+           return loot[rarity][index];
+       }
+       dropChance = Number(dropChance);
+       if (typeof dropChance != 'number') throw new Error('dropChance has to be a number');
+       content[destinationIndex].loot = Math.random() < dropChance ? getRandomItem(rarity) : false;
+       this.setState({ content });
+   }
+
+   generateBoss(bossWidth) {
+       let table = {...this.state.table};
+       const cells = table.content;
+       const emptyCells = this.findEmptyCells();
+       if (!emptyCells.length) throw new Error('No empty cell to generate potions');
+       const emptyBoxesStartingIndexes = emptyCells.filter((cell, i) => {
+           const anyOccupiedCells = (from, length) => {
+              const height = length;
+              for (var i = 0; i < height; i++) {
+
+                     for (var j = 0; j < length; j++) {
+                        if (cells[from + j + table.width * i] &&
+                            (cells[from + j + table.width * i].wall ||
+                            cells[from + j + table.width * i].enemy ||
+                            cells[from + j + table.width * i].player ||
+                            cells[from + j + table.width * i].loot ||
+                            cells[from + j + table.width * i].potion ||
+                            cells[from + j + table.width * i].portal
+                        )) return true;
+
+                     }
+              }
+              return false;
+           }
+           if (!anyOccupiedCells(cell, bossWidth)) return cell;
+       });
+       const bossPositionIndex = this.randomNumericElementsFromArray(emptyBoxesStartingIndexes, 1, 'no-neighbors');
+       const damage = 50 + table.playerStats.level * 4;
+       if (table.dungeonLevel % 3 === 0) {
+           this.makeBox(bossPositionIndex, bossWidth, bossWidth, true, 'boss');
+           table.boss = {from: bossPositionIndex, width: bossWidth, health: 500, damage: this.aNumberBetween(damage - 10,  damage + 10)};
+               table.boss.health += 25 * table.playerStats.level;
+       } else table.boss = null;
+       this.setState({ table });
+   }
+
+   findPlayerCoords(playerIndex, cellWidth) {
+       let state = {...this.state};
+       const numOfRows = Math.floor(playerIndex / state.table.width) + 1;
+       const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+       state.screen.yCoord = numOfRows * cellWidth - viewportHeight / 2;
+       this.setState({ state });
+   }
+
+   aSoundOf(soundName) {
+       const weaponSoundUrls = ['dungeon-crawler-assets/sound/weapon/swing.wav',
+         'dungeon-crawler-assets/sound/weapon/swing2.wav',
+         'dungeon-crawler-assets/sound/weapon/swing3.wav'];
+       const potionSoundUrls = ['dungeon-crawler-assets/sound/potion/bottle.wav',
+         'dungeon-crawler-assets/sound/potion/bubble.wav',
+         'dungeon-crawler-assets/sound/potion/bubble2.wav',
+         'dungeon-crawler-assets/sound/potion/bubble3.wav'];
+       const doorSoundUrls = ['dungeon-crawler-assets/sound/door/door.wav'];
+       const monsterSoundUrls = ['dungeon-crawler-assets/sound/monster/mnstr1.wav',
+         'dungeon-crawler-assets/sound/monster/mnstr2.wav',
+         'dungeon-crawler-assets/sound/monster/mnstr3.wav',
+         'dungeon-crawler-assets/sound/monster/mnstr4.wav'];
+       const bossSoundUrls = ['dungeon-crawler-assets/sound/monster/burp.wav'];
+       const backgroundMusicUrls = ['dungeon-crawler-assets/music/dungeongroove_loop_low.ogg'];
+       const lootSoundUrls = ['dungeon-crawler-assets/sound/weapon/metal-small2.wav',
+         'dungeon-crawler-assets/sound/weapon/metal-small3.wav'];
+       const levelUpUrls = ['dungeon-crawler-assets/sound/level-up/chipquest.wav'];
+       const playerDeathUrls = ['dungeon-crawler-assets/sound/p1-death/die1.wav',
+         'dungeon-crawler-assets/sound/p1-death/die2.wav'];
+       const pickASound = (urlArray) => {
+           const soundArray = [];
+           urlArray.forEach((url, i) => {
+               soundArray.push(new Audio(url));
+           });
+           return soundArray[this.aNumberBetween(0, urlArray.length - 1)];
+       }
+       const urlArray = {
+           weapon: weaponSoundUrls,
+           potion: potionSoundUrls,
+           door: doorSoundUrls,
+           monster: monsterSoundUrls,
+           boss: bossSoundUrls,
+           music: backgroundMusicUrls,
+           loot: lootSoundUrls,
+           levelUp: levelUpUrls,
+           dying: playerDeathUrls
+       }
+       return pickASound(urlArray[soundName]);
+   }
+
+   movePlayer(e) {
+      let state = {...this.state};
+      let table = {...this.state.table};
+      const playerIndex = table.playerPosition;
+      const playerStats = table.playerStats;
+      const strength = playerStats.strength;
+      const playerMinDmg = playerStats.weapon.damage.min * strength;
+      const playerMaxDmg = playerStats.weapon.damage.max * strength;
+      const playerDmg = this.aNumberBetween(playerMinDmg, playerMaxDmg);
+      const boss = table.boss;
+      const cells = table.content;
+      const to = ((index) => {
+         return {
+            s: index + table.width,
+            s2: index + table.width * 2,
+            s3: index + table.width * 3,
+            s4: index + table.width * 4,
+            s5: index + table.width * 5,
+            s6: index + table.width * 6,
+            n: index - table.width,
+            n2: index - table.width * 2,
+            n3: index - table.width * 3,
+            n4: index - table.width * 4,
+            n5: index - table.width * 5,
+            n6: index - table.width * 6,
+            w: index - 1,
+            w2: index - 1 * 2,
+            w3: index - 1 * 3,
+            w4: index - 1 * 4,
+            w5: index - 1 * 5,
+            w6: index - 1 * 6,
+            e: index + 1,
+            e2: index + 1 * 2,
+            e3: index + 1 * 3,
+            e4: index + 1 * 4,
+            e5: index + 1 * 5,
+            e6: index + 1 * 6,
+         }
+      })(playerIndex);
+
+      // Sight-radius
+      const blurryTilesIndexes = (() => {
+          let clearTiles = [playerIndex, to.n, to.n - 1, to.n + 1, to.s, to.s - 1, to.s + 1, to.w, to.e];
+          let blurryTiles =
+          [to.n2, to.n2 -1, to.n2 -2, to.n2 + 1, to.n2 + 2,
+           to.s2, to.s2 - 1, to.s2 - 2, to.s2 + 1, to.s2 + 2,
+           to.w2, to.w2 - table.width, to.w2 + table.width,
+           to.e2, to.e2 - table.width, to.e2 + table.width];
+          let blurrierTiles =
+          [to.n3, to.n3 - 1, to.n3 - 2, to.n3 - 3,
+           to.n3 + 1, to.n3 + 2, to.n3 + 3,
+
+           to.s3, to.s3 - 1, to.s3 - 2, to.s3 - 3,
+           to.s3 + 1, to.s3 + 2, to.s3 + 3,
+
+           to.w3, to.w3 - table.width * 1, to.w3 - table.width * 2,
+           to.w3 + table.width * 1, to.w3 + table.width * 2,
+
+           to.e3, to.e3 - table.width * 1, to.e3 - table.width * 2,
+           to.e3 + table.width * 1, to.e3 + table.width * 2];
+          let blurriestTiles =
+          [to.n4, to.n4 - 1, to.n4 - 2, to.n4 + 1, to.n4 + 2,
+           to.n5, to.n5 - 1, to.n5 + 1, to.n6,
+
+           to.s4, to.s4 - 1, to.s4 - 2, to.s4 + 1, to.s4 + 2,
+           to.s5, to.s5 - 1, to.s5 + 1, to.s6,
+
+           to.w4, to.w4 - table.width * 1, to.w4 - table.width * 2,
+           to.w4 + table.width * 1, to.w4 + table.width * 2,
+           to.w5, to.w5 - table.width, to.w5 + table.width, to.w6,
+
+           to.e4, to.e4 - table.width * 1, to.e4 - table.width * 2,
+           to.e4 + table.width * 1, to.e4 + table.width * 2,
+           to.e5, to.e5 - table.width, to.e5 + table.width, to.e6,
+          ];
+          // This gets rid of all edge tiles so sight-radius doesn't bleed out weird when player is on edges
+          const anyEdgeCells = (() => {
+              clearTiles = clearTiles
+              .filter(tileIndex => (!this.isEdgeCell(tileIndex).leftEdgeCell && !this.isEdgeCell(tileIndex, table.width).rightEdgeCell));
+              blurryTiles = blurryTiles
+              .filter(tileIndex => (!this.isEdgeCell(tileIndex).leftEdgeCell && !this.isEdgeCell(tileIndex, table.width).rightEdgeCell));
+              blurrierTiles = blurrierTiles
+              .filter(tileIndex => (!this.isEdgeCell(tileIndex).leftEdgeCell && !this.isEdgeCell(tileIndex, table.width).rightEdgeCell));
+              blurriestTiles = blurriestTiles
+              .filter(tileIndex => (!this.isEdgeCell(tileIndex).leftEdgeCell && !this.isEdgeCell(tileIndex, table.width).rightEdgeCell));
+          })();
+
+          return {
+              clear: clearTiles,
+              blurry: blurryTiles,
+              blurrier: blurrierTiles,
+              blurriest: blurriestTiles
+          }
+      })();
+
+      const convertKeyToDirection = (key) => {
+          if (key === 'ArrowDown') return to.s;
+          if (key === 'ArrowUp') return to.n;
+          if (key === 'ArrowLeft') return to.w;
+          if (key === 'ArrowRight') return to.e;
+      }
+
+      if (!e) this.setState({ table });
+      const act = (keycode) => {
+
+          // Walk
+          if (cells[convertKeyToDirection(keycode)] &&
+          !cells[convertKeyToDirection(keycode)].wall &&
+          !cells[convertKeyToDirection(keycode)].enemy &&
+          !cells[convertKeyToDirection(keycode)].potion &&
+          !cells[convertKeyToDirection(keycode)].loot &&
+          !cells[convertKeyToDirection(keycode)].boss &&
+          !cells[convertKeyToDirection(keycode)].portal) {
+
+              if (e.key === 'ArrowUp') window.scrollTo(0, state.screen.yCoord -= 20);
+              else if (e.key === 'ArrowDown') window.scrollTo(0, state.screen.yCoord += 20);
+
+              // Lighten tiles where player will be
+              Object.keys(blurryTilesIndexes).forEach(key => {
+                  blurryTilesIndexes[key].forEach(tileIndex => {
+                      if(cells[tileIndex]) {
+                          cells[tileIndex][key] = true;
+                          cells[tileIndex].fog = false;
+                      } else return;
+
+                  });
+              });
+             cells[playerIndex].player = false;
+             if (keycode === 'ArrowUp')
+                cells[convertKeyToDirection(keycode)].player = 'back';
+             else if (keycode === 'ArrowDown')
+                cells[convertKeyToDirection(keycode)].player = 'front';
+             else if (keycode === 'ArrowLeft')
+                cells[convertKeyToDirection(keycode)].player = 'left';
+             else if (keycode === 'ArrowRight')
+                cells[convertKeyToDirection(keycode)].player = 'right';
+             table.playerPosition = convertKeyToDirection(keycode);
+         }
+          // Attack, receive damage and drop loot
+          else if (cells[convertKeyToDirection(keycode)] && cells[convertKeyToDirection(keycode)].enemy) {
+             table.currentEnemy = cells[convertKeyToDirection(keycode)].enemy;
+             this.aSoundOf('weapon').play();
+             cells[convertKeyToDirection(keycode)].enemy.health -= playerDmg;
+             if (cells[convertKeyToDirection(keycode)].enemy.health <= 0) {
+                table.currentEnemy = null;
+                this.aSoundOf('monster').play();
+                const xp = 20 + table.dungeonLevel * 15;
+                cells[convertKeyToDirection(keycode)].enemy = false;
+                playerStats.xp += this.aNumberBetween(xp - 5, xp + 5);
+                // Level up
+                if (playerStats.xp >= table.playerStats.xpCap) {
+                    this.aSoundOf('levelUp').play();
+                    playerStats.level++;
+                    playerStats.xp = 0;
+                    playerStats.strength += 0.2;
+                    playerStats.health += 20 * table.dungeonLevel;
+                    playerStats.xpCap += playerStats.xpCap * 0.5 * playerStats.level;
+                }
+                // Drop chance for different levels of items
+                if ( Math.random() < 0.3)
+                    this.generateLoot(convertKeyToDirection(keycode), 'basic', 1);
+                else if (Math.random() < 0.1)
+                    this.generateLoot(convertKeyToDirection(keycode), 'pro', 1);
+                else if (Math.random() < 0.01)
+                    this.generateLoot(convertKeyToDirection(keycode), 'rare', 1);
+             } else if (cells[convertKeyToDirection(keycode)].enemy)
+             playerStats.health -= cells[convertKeyToDirection(keycode)].enemy.damage;
+             // Player dies
+             if (playerStats.health <= 0) {
+                 this.aSoundOf('dying').play();
+                 playerStats.health = 0;
+                 cells[playerIndex].player = false;
+                 table.playerPosition = null;
+             }
+         }
+         // Consume potion
+         else if (cells[convertKeyToDirection(keycode)] && cells[convertKeyToDirection(keycode)].potion) {
+             this.aSoundOf('potion').play();
+             playerStats.health += cells[convertKeyToDirection(keycode)].potion;
+             cells[convertKeyToDirection(keycode)].potion = false;
+         }
+         // Equip dropped weapon
+         else if (cells[convertKeyToDirection(keycode)] && cells[convertKeyToDirection(keycode)].loot) {
+             this.aSoundOf('loot').play();
+             playerStats.weapon = cells[convertKeyToDirection(keycode)].loot;
+             cells[convertKeyToDirection(keycode)].loot = false;
+         }
+         // Deal damage to and receive damage from boss
+         else if (cells[convertKeyToDirection(keycode)] && cells[convertKeyToDirection(keycode)].boss) {
+             this.aSoundOf('weapon').play();
+             boss.health -= playerDmg;
+             if (boss.health <= 0) {
+                 this.aSoundOf('boss');
+                 cells[boss.from].boss = false;
+                 cells[boss.from + boss.width - 1].boss = false;
+                 cells[boss.from + table.width].boss = false;
+                 cells[boss.from + boss.width - 1 + table.width].boss = false;
+                 table.boss = null;
+                 if ( Math.random() < 0.65)
+                     this.generateLoot(convertKeyToDirection(keycode), 'basic', 1);
+                 else if (Math.random() < 0.4)
+                     this.generateLoot(convertKeyToDirection(keycode), 'pro', 1);
+                 else if (Math.random() < 0.15)
+                     this.generateLoot(convertKeyToDirection(keycode), 'rare', 1);
+             } else if (boss.health) playerStats.health -= boss.damage;
+             if (playerStats.health <= 0) {
+                 this.aSoundOf('dying').play();
+                 playerStats.health = 0;
+                 cells[playerIndex].player = false;
+             }
+
+         }
+         // Take portal to new level
+         else if (cells[convertKeyToDirection(keycode)] && cells[convertKeyToDirection(keycode)].portal) {
+             this.aSoundOf('door').play();
+             this.generateNewLevel();
+         }
+      }
+
+      act(e.key);
+      e.preventDefault();
+      this.setState({ state });
+
+      this.setState({ table });
+   }
+
+   avgOf(a, b, decimal) {
+      return Number(((a + b) / 2).toFixed(decimal));
+   }
+
+   componentWillMount() {
+
+      this.makeTable(50, 100);
+      this.makeCaves(8, 12, 0.015);
+      this.connectCaves();
+      this.generatePlayer('new');
+      this.generatePortal();
+      this.generateEnemies(40);
+      this.generatePotions(30);
+      document.addEventListener('keydown', this.movePlayer);
+   }
+
+   componentDidMount() {
+       let state = {...this.state};
+       // This prevents screen from scrolling with mousewheel or trackpad
+       window.onwheel = (e) => e.preventDefault();
+   }
+   // Display player info when start screen is off
+   render() {
+      return (
+          <div className='container'>
+              {this.state.startScreen ? null : <Info table={this.state.table} avgOf={this.avgOf} /> }
+              <div className='app'>
+                 <Table table={this.state.table} />
+                 <Fog table={this.state.table} />
+              </div>
+              {this.state.startScreen ? <StartScreen state={this.state} toggleMusic={this.toggleMusic} handleButtonClick={this.handleButtonClick}/> : null}
+          </div>
+      );
+   }
+}
+
+const Table = (props) => {
+   const table = props.table;
+   const cells = table.content;
+   const tableWidth = table.width;
+   const tableHeight = table.height;
+   // This is a template for making table-cells
+   const dummyArray = (length) => {
+      let dummy = new Array(length);
+      for (let i = 0; i < length; i++) dummy[i] = null;
+      return dummy;
+   };
+   return (
+      <div className='table'>
+         {dummyArray(tableHeight).map((row, i) => {
+               const rowIndex = i;
+               return (
+                  <tr>
+                  {dummyArray(tableWidth).map((col, i) => {
+                        const cellIndex = rowIndex * tableWidth + i;
+                        return (
+                           <td className={'cell' +
+                                 (() => {
+                                 if (cells[cellIndex].player === 'front') return ' player-front';
+                                 else if (cells[cellIndex].player === 'back') return ' player-back';
+                                 else if (cells[cellIndex].player === 'left') return ' player-left';
+                                 else if (cells[cellIndex].player === 'right') return ' player-right';
+                                 else if (cells[cellIndex].enemy) return ' enemy';
+                                 else if (cells[cellIndex].potion) return ' potion';
+                                 else if (cells[cellIndex].loot) return ' loot';
+                                 else if (cells[cellIndex].boss === 'top-left') return ' boss-top-left';
+                                 else if (cells[cellIndex].boss === 'top-right') return ' boss-top-right';
+                                 else if (cells[cellIndex].boss === 'bottom-left') return ' boss-bottom-left';
+                                 else if (cells[cellIndex].boss === 'bottom-right') return ' boss-bottom-right';
+                                 else if (cells[cellIndex].portal) return ' portal';
+                                 else return '';
+                             })()} id={cellIndex} style={{background: cells[cellIndex].wall ? 'url("dungeon-crawler-assets/wall.png") center/100%' : 'url("dungeon-crawler-assets/dirt.png") center/100%'}} ></td>
+                        );
+                     })
+                  }
+                  </tr>
+               );
+            })
+         }
+      </div>
+   );
+}
+
+const Fog = (props) => {
+   const table = props.table;
+   const cells = table.content;
+   const tableWidth = table.width;
+   const tableHeight = table.height;
+   // This is template for making table-cells
+   const dummyArray = (length) => {
+      let dummy = new Array(length);
+      for (let i = 0; i < length; i++) dummy[i] = null;
+      return dummy;
+   };
+   return (
+      <div className='fog'>
+         {dummyArray(tableHeight).map((row, i) => {
+               const rowIndex = i;
+               return (
+                  <tr>
+                  {dummyArray(tableWidth).map((col, i) => {
+                        const cellIndex = rowIndex * tableWidth + i;
+                        return (
+                           <td className={'cell' +
+                                 (() => {
+                                 if (cells[cellIndex].clear) return ' clear';
+                                 else if (cells[cellIndex].blurry) return ' blurry';
+                                 else if (cells[cellIndex].blurrier) return ' blurrier';
+                                 else if (cells[cellIndex].blurriest) return ' blurriest';
+                                 else return '';
+                             })()} id={'f' + cellIndex} style={{background: cells[cellIndex].fog ? 'rgba(0,0,0,1)' : 'rgba(255,255,255,0)'}} ></td>
+                        );
+                     })
+                  }
+                  </tr>
+               );
+            })
+         }
+      </div>
+   );
+}
+
+const Info = (props) => {
+   const tableWidth = props.table.width;
+   const health = props.table.playerStats.health;
+   const level = props.table.playerStats.level;
+   const weapon = props.table.playerStats.weapon.name;
+   const xp = props.table.playerStats.xp;
+   const minDamage = props.table.playerStats.weapon.damage.min;
+   const maxDamage = props.table.playerStats.weapon.damage.max;
+   const strength = props.table.playerStats.strength;
+   const xpCap = props.table.playerStats.xpCap;
+   const avgOf = props.avgOf;
+   const dungeonLevel = props.table.dungeonLevel;
+   const boss = props.table.boss;
+   const currentEnemy = props.table.currentEnemy;
+
+   return (
+      <div className='info' style={{width: tableWidth * 20 + 'px'}} >
+         <span className='stats'>
+            {'Health: ' + health}&nbsp;&nbsp;&nbsp;
+            {'Level: ' + level}&nbsp;&nbsp;&nbsp;
+            {'XP to Lvl: ' + (xpCap - xp)}<br/>
+            {'Weapon: ' + weapon}&nbsp;&nbsp;&nbsp;
+            {'Weapon Damage: ' + minDamage + '-' + maxDamage}<br/>
+            {'Average Damage Dealt: ' +
+            avgOf(minDamage * strength, maxDamage * strength, 2)}<br/>
+            {'Dungeon Level: ' + dungeonLevel}&nbsp;&nbsp;&nbsp;
+            {(currentEnemy ? ('Tormented Soul: ' + currentEnemy.health) : '')}&nbsp;&nbsp;&nbsp;
+            {(boss ? ('Boss Health: ' + boss.health) : '')}
+         </span>
+      </div>
+   );
+}
+
+const StartScreen = (props) => {
+    const state = props.state;
+    const table = state.table;
+    const viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    const infoHeight = 130;
+    const toggleMusic = props.toggleMusic;
+    const handleButtonClick = props.handleButtonClick;
+    return (
+        <div className='start-screen' style={{height: viewportHeight + 'px'}}>
+            <p className='title' >Sinister Pixels: A Dungeon Crawler</p>
+            <div className='controls' >
+                <button type='button' onClick={handleButtonClick}>Start Game</button>&nbsp;&nbsp;
+                <label for='music'>Music&nbsp;<input type='checkbox' id='music' onClick={toggleMusic}/></label>
+            </div>
+            <p className='footer' >Created By YH</p>
+        </div>
+
+    );
+}
+
+ReactDOM.render(
+   <App />,
+   document.getElementById('app')
+);

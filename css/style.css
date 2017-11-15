@@ -1,0 +1,150 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  font-size: 1em;
+  font-family: 'Press Start 2P', cursive;
+}
+
+body {
+  background: black;
+}
+
+::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  background: transparent;
+}
+
+.container {
+  position: relative;
+  margin: 0 auto;
+  width: 1000px;
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/dirt.png") center/100%;
+}
+.container .info {
+  padding-top: 1em;
+  z-index: 100;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  height: 130px;
+  position: fixed;
+  background-color: black;
+  top: 0;
+  font-size: 1em;
+}
+.container .info .stats {
+  color: white;
+  line-height: 1.5em;
+}
+.container .start-screen {
+  width: 1000px;
+  position: absolute;
+  margin-top: -130px;
+  top: 0;
+  left: 0;
+  background: black !important;
+  z-index: 20;
+  color: white;
+  text-align: center;
+}
+.container .start-screen .title {
+  font-size: 1.5em;
+  top: 6em !important;
+}
+.container .start-screen .footer {
+  font-size: 1em;
+  top: 6em !important;
+}
+.container .start-screen .title, .container .start-screen .footer, .container .start-screen .controls {
+  position: relative;
+}
+.container .start-screen .controls {
+  text-align: center;
+  top: 50%;
+  transform: translateY(-1.5em);
+}
+.container .start-screen .controls button {
+  padding: 1em 1em 1em 1em;
+  border-radius: 5px;
+}
+.container .start-screen .controls label {
+  color: white;
+}
+.container .app {
+  width: 1000px;
+  margin: 0 auto;
+  margin-top: 130px;
+}
+.container .app .table, .container .app .fog {
+  display: inline-block;
+}
+.container .app .table tr .cell, .container .app .fog tr .cell {
+  width: 20px;
+  height: 20px;
+}
+.container .app .table tr .cell.player-front {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/player/p1-front-stand.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.player-back {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/player/p1-back-stand.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.player-left {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/player/p1-left-stand.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.player-right {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/player/p1-right-stand.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.enemy {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/ghost.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.potion {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/potion.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.loot {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/sword.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.boss-top-left {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/demon/demon-top-left.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.boss-top-right {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/demon/demon-top-right.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.boss-bottom-left {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/demon/demon-bottom-left.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.boss-bottom-right {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/demon/demon-bottom-right.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .table tr .cell.portal {
+  background: url("https://raw.githubusercontent.com/hongyi0220/assets/master/dungeon-crawler-assets/door.png") no-repeat center/100% !important;
+  background-size: cover !important;
+}
+.container .app .fog {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.container .app .fog tr .cell.clear {
+  background-color: rgba(255, 255, 255, 0) !important;
+}
+.container .app .fog tr .cell.blurry {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+}
+.container .app .fog tr .cell.blurrier {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+.container .app .fog tr .cell.blurriest {
+  background-color: rgba(0, 0, 0, 0.8) !important;
+}
